@@ -1,5 +1,5 @@
-import { cachedSite, loadSite, fullSrc, SECTIONS, telHref, waHref, mailHref, mapEmbed, ID_RE } from './data.js?v=202611221101';
-import { h, icon } from './ui.js?v=202611221101';
+import { cachedSite, loadSite, fullSrc, SECTIONS, telHref, waHref, mailHref, mapEmbed, ID_RE } from './data.js?v=202611221116';
+import { h, icon } from './ui.js?v=202611221116';
 
 const $ = (s, r = document) => r.querySelector(s);
 const main = $('#main');
@@ -55,14 +55,7 @@ function setActive(name) {
   document.querySelectorAll('[data-route]').forEach(a => a.classList.toggle('on', a.dataset.route === name));
   movePill();
 }
-function movePill() {
-  const nav = $('.links'), pill = nav && nav.querySelector('.pill'), on = nav && nav.querySelector('a.on');
-  if (!pill) return;
-  if (!on) { pill.style.opacity = '0'; return; }
-  pill.style.opacity = '1';
-  pill.style.width = on.offsetWidth + 'px';
-  pill.style.transform = `translateX(${on.offsetLeft}px)`;
-}
+function movePill() { /* active link is underlined in CSS */ }
 addEventListener('resize', movePill);
 if (document.fonts) document.fonts.ready.then(movePill);
 const burger = $('#burger'), sheet = $('#sheet');
@@ -74,7 +67,10 @@ burger.addEventListener('click', () => {
   if (open) sheet.querySelectorAll('a').forEach(a => { a.style.animation = 'none'; void a.offsetWidth; a.style.animation = ''; });
 });
 addEventListener('keydown', e => { if (e.key === 'Escape') { closeSheet(); const lb = $('.lb'); if (lb) lb.remove(); } });
-// the top bar always stays visible (no hide/show on scroll, which made scrolling feel jumpy)
+// the top bar always stays visible; a hairline appears once the page is scrolled
+const navEl = $('#nav');
+const onScrollNav = () => navEl.classList.toggle('scrolled', scrollY > 8);
+addEventListener('scroll', onScrollNav, { passive: true }); onScrollNav();
 
 /* ------------------------------------------------------------------ */
 /* Reveal on scroll                                                    */
@@ -86,6 +82,12 @@ function observe(root) {
   root.querySelectorAll('[data-r], .words, [data-count]').forEach(el => (reduce ? (el.classList.add('in')) : io.observe(el)));
 }
 const R = (el, kind = '', d = 0) => { el.dataset.r = kind; if (d) el.style.setProperty('--d', d + 's'); return el; };
+// Give each child of a grid/list its own scroll reveal, a little later than the one before (per row of up to 4).
+function stagger(el, kind = '', step = 0.08) {
+  if (!el) return el;
+  [...el.children].forEach((c, i) => { if (c.dataset.r == null) R(c, kind, (i % 4) * step); });
+  return el;
+}
 function words(tag, text, cls = '', base = 0, grey = 0) {
   const el = h(tag, { class: 'words ' + cls });
   const parts = text.split(/\s+/).filter(Boolean);
@@ -157,12 +159,10 @@ function pageHome(v) {
     h('h1', null, words('span', H.heroLine1, 'serif', .1), words('span', H.heroLine2, '', .25)),
     R(h('p', { class: 'sub' }, H.heroSub), '', .45),
     R(h('div', { class: 'ctas' }, arrowBtn('View products', '#/products'), arrowBtn('Contact us', '#/contact', 'btn-light')), '', .55));
-  v.append(hero);
-
-  if (H.gallery.length) v.append(R(curve(H.gallery), 'fade', .3));
+  v.append(h('div', { class: 'heroscreen' }, hero, H.gallery.length ? R(curve(H.gallery), 'fade', .3) : null));
 
   const trio = h('div', { class: 'trio wrap' }, SECTIONS.map((k, i) =>
-    R(h('a', { href: k === 'transport' ? '#/transport' : '#/products/' + k }, h('h3', null, H.sections[k].title), h('p', null, H.sections[k].text)), '', .1 * i)));
+    R(h('a', { href: k === 'transport' ? '#/transport' : '#/products/' + k }, h('h3', null, H.sections[k].title), h('p', null, H.sections[k].text)), '', .12 * i)));
   v.append(trio);
 
   if (H.stats.length) {
@@ -362,6 +362,7 @@ function productsUpdate(r, first = false) {
     ...path.flatMap(c => [h('span', { class: 'sep', 'aria-hidden': 'true' }, '/'), h('button', { class: c.id === cat ? 'on' : '', onclick: () => setQuery(sec, c.id, q) }, c.name)]),
     q ? h('button', { class: 'qchip', onclick: () => setQuery(sec, cat, '') }, '“' + q + '”  ×') : null].filter(Boolean));
   P.grid.replaceChildren(...(items.length ? items.map((it, i) => itemCard(it, i)) : [h('div', { class: 'empty' }, h('b', null, 'Nothing here yet'), q ? 'Try another search word.' : 'We are adding items to this category soon. Call or WhatsApp us to ask.')]));
+  stagger(P.grid, 'card', 0.07); observe(P.grid);
 }
 
 /* ------------------------------------------------------------------ */
@@ -534,6 +535,7 @@ function pageContact(v) {
     R(h('div', { class: 'mapcard span12' }, mapFrame()), 'scale'),
   );
   if (mailHref(C.email)) grid.append(R(contactForm('span12'), 'scale'));
+  [...grid.children].forEach((c, i) => c.style.setProperty('--d', (i % 3) * 0.09 + 's'));
   if (C.facebook) grid.append(R(h('a', { class: 'ccard span12', href: C.facebook, target: '_blank', rel: 'noopener noreferrer', style: { flexDirection: 'row', alignItems: 'center', gap: '16px' } }, h('span', { class: 'ic', style: { margin: 0 } }, icon('fb')), h('span', { class: 'val sm' }, 'Follow Kawya Group on Facebook')), 'scale'));
   v.append(h('section', { class: 'wrap', style: { paddingBottom: '60px' } }, grid));
 }
@@ -564,8 +566,8 @@ function contactForm(span) {
 /* ------------------------------------------------------------------ */
 function renderChrome() {
   const C = S.settings; const wa = waHref(waNumber());
-  const navWa = $('#navWa'), fab = $('#fab');
-  if (wa) { navWa.href = wa; fab.href = wa; } else { navWa.href = '#/contact'; fab.href = '#/contact'; navWa.removeAttribute('target'); fab.removeAttribute('target'); }
+  const fab = $('#fab');
+  if (wa) fab.href = wa; else { fab.href = '#/contact'; fab.removeAttribute('target'); }
   fab.replaceChildren(icon('wa'));
   $('#foot').replaceChildren(h('div', { class: 'wrap' },
     h('div', { class: 'cols' },
@@ -575,6 +577,8 @@ function renderChrome() {
       h('div', null, h('h4', null, 'Contact'), C.phones.slice(0, 3).map(p => h('a', { href: telHref(p.number) }, p.number)), wa ? h('a', { href: wa, target: '_blank', rel: 'noopener noreferrer' }, 'WhatsApp') : null, h('a', { href: dirLink(), target: '_blank', rel: 'noopener noreferrer' }, C.address))),
     h('div', { class: 'big', 'aria-hidden': 'true' }, 'Kawya Group'),
     h('div', { class: 'bottom' }, h('span', null, '© ' + new Date().getFullYear() + ' Kawya Group. All rights reserved.'), h('span', null, 'Every concrete item SLS certified'))));
+  stagger($('#foot .cols')); R($('#foot .big'), 'fade', .1); R($('#foot .bottom'), '', .1);
+  observe($('#foot'));
 }
 
 /* ------------------------------------------------------------------ */
