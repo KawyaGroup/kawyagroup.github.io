@@ -1,0 +1,123 @@
+rules_version = '2';
+// Kawya Group website - Firestore security rules.
+// 1. Replace OWNER_UID_HERE with the owner's User UID (Firebase console > Authentication > Users).
+// 2. Paste this whole file into Firestore Database > Rules and press Publish.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Only these accounts can change the website (UID, not email, so nobody can claim it by signing up).
+    function isOwner() {
+      return request.auth != null && request.auth.uid in ['P8TaBcnZC3gVTwjhe3x3G53CbsD3'];
+    }
+
+    // ---------- field checks ----------
+    function str(v, max) { return v is string && v.size() <= max; }
+    function sec(v) { return v in ['concrete', 'transport', 'hardware']; }
+    function imgSrc(t) {
+      return t == '' || t.matches('^data:image/(webp|jpeg|png);base64,[A-Za-z0-9+/=]+$') || t.matches('^assets/[A-Za-z0-9_-]+(/[A-Za-z0-9_-]+)*[.](svg|png|jpg|jpeg|webp)$');
+    }
+    function img(o) {
+      return o is map && o.keys().hasOnly(['t', 'm', 'c', 'label']) && o.keys().hasAll(['t', 'm'])
+        && str(o.t, 60000) && imgSrc(o.t)
+        && str(o.m, 40) && (o.m == '' || o.m.matches('^[A-Za-z0-9_-]+$'))
+        && (!('c' in o) || o.c is bool) && (!('label' in o) || str(o.label, 80));
+    }
+    function imgs(l, n) { return l is list && l.size() <= n && (l.size() <= 0 || img(l[0])) && (l.size() <= 1 || img(l[1])) && (l.size() <= 2 || img(l[2])) && (l.size() <= 3 || img(l[3])) && (l.size() <= 4 || img(l[4])) && (l.size() <= 5 || img(l[5])) && (l.size() <= 6 || img(l[6])) && (l.size() <= 7 || img(l[7])) && (l.size() <= 8 || img(l[8])) && (l.size() <= 9 || img(l[9])) && (l.size() <= 10 || img(l[10])) && (l.size() <= 11 || img(l[11])); }
+    function pair(o, a, b, ma, mb) { return o is map && o.keys().hasOnly([a, b]) && str(o[a], ma) && str(o[b], mb); }
+    function spec(o) { return pair(o, 'k', 'v', 40, 80); }
+    function phone(o) { return pair(o, 'number', 'label', 24, 40); }
+    function stat(o) { return pair(o, 'value', 'label', 12, 40); }
+    function value(o) { return pair(o, 'title', 'text', 60, 200); }
+    function line(o) { return str(o, 60); }
+    function block(o) { return o is map && o.keys().hasOnly(['title', 'text']) && str(o.title, 60) && str(o.text, 400); }
+
+    function validItem(d) {
+      let keys = ['name', 'section', 'category', 'summary', 'description', 'specs', 'sls', 'badge', 'images', 'visible', 'featured', 'hire', 'order'];
+      let l = d.specs;
+      return d.keys().hasOnly(keys) && d.keys().hasAll(keys)
+        && str(d.name, 120) && d.name.size() > 0 && sec(d.section) && str(d.category, 40)
+        && str(d.summary, 200) && str(d.description, 3000)
+        && l is list && l.size() <= 12 && (l.size() <= 0 || spec(l[0])) && (l.size() <= 1 || spec(l[1])) && (l.size() <= 2 || spec(l[2])) && (l.size() <= 3 || spec(l[3])) && (l.size() <= 4 || spec(l[4])) && (l.size() <= 5 || spec(l[5])) && (l.size() <= 6 || spec(l[6])) && (l.size() <= 7 || spec(l[7])) && (l.size() <= 8 || spec(l[8])) && (l.size() <= 9 || spec(l[9])) && (l.size() <= 10 || spec(l[10])) && (l.size() <= 11 || spec(l[11]))
+        && d.sls is bool && str(d.badge, 24) && imgs(d.images, 8)
+        && d.visible is bool && d.featured is bool && d.hire is bool && d.order is number;
+    }
+    function validCategory(d) {
+      let keys = ['name', 'section', 'parent', 'order'];
+      return d.keys().hasOnly(keys) && d.keys().hasAll(keys)
+        && str(d.name, 60) && d.name.size() > 0 && sec(d.section)
+        && str(d.parent, 40) && d.order is number;
+    }
+    function validSettings(d) {
+      let l = d.phones;
+      return d.keys().hasOnly(['phones', 'whatsapp', 'email', 'address', 'hours', 'mapLat', 'mapLng', 'mapLink', 'facebook'])
+        && l is list && l.size() <= 8 && (l.size() <= 0 || phone(l[0])) && (l.size() <= 1 || phone(l[1])) && (l.size() <= 2 || phone(l[2])) && (l.size() <= 3 || phone(l[3])) && (l.size() <= 4 || phone(l[4])) && (l.size() <= 5 || phone(l[5])) && (l.size() <= 6 || phone(l[6])) && (l.size() <= 7 || phone(l[7]))
+        && str(d.whatsapp, 24) && str(d.email, 120) && str(d.address, 300) && str(d.hours, 120)
+        && d.mapLat is number && d.mapLng is number
+        && str(d.mapLink, 600) && (d.mapLink == '' || d.mapLink.matches('^https://(maps[.]app[.]goo[.]gl|goo[.]gl/maps|(www[.])?google[.][a-z.]+/maps)[^ <>"]*$'))
+        && str(d.facebook, 300) && (d.facebook == '' || d.facebook.matches('^https://(www[.]|m[.])?facebook[.]com/[^ <>"]*$'));
+    }
+    function validHome(d) {
+      let l = d.stats;
+      return d.keys().hasOnly(['badge', 'heroLine1', 'heroLine2', 'heroSub', 'gallery', 'stats', 'sections', 'slsTitle', 'slsText'])
+        && str(d.badge, 80) && str(d.heroLine1, 80) && str(d.heroLine2, 120) && str(d.heroSub, 400)
+        && imgs(d.gallery, 10)
+        && l is list && l.size() <= 4 && (l.size() <= 0 || stat(l[0])) && (l.size() <= 1 || stat(l[1])) && (l.size() <= 2 || stat(l[2])) && (l.size() <= 3 || stat(l[3]))
+        && d.sections is map && d.sections.keys().hasOnly(['concrete', 'transport', 'hardware'])
+        && block(d.sections.concrete) && block(d.sections.transport) && block(d.sections.hardware)
+        && str(d.slsTitle, 100) && str(d.slsText, 500);
+    }
+    function validAbout(d) {
+      let l = d.values;
+      return d.keys().hasOnly(['title', 'intro', 'story', 'storyImage', 'bossName', 'bossRole', 'bossMessage', 'bossPhoto', 'slsTitle', 'slsText', 'certs', 'mission', 'vision', 'values'])
+        && str(d.title, 120) && str(d.intro, 600) && str(d.story, 3000) && img(d.storyImage)
+        && str(d.bossName, 80) && str(d.bossRole, 80) && str(d.bossMessage, 800) && img(d.bossPhoto)
+        && str(d.slsTitle, 100) && str(d.slsText, 800) && imgs(d.certs, 12)
+        && str(d.mission, 500) && str(d.vision, 500)
+        && l is list && l.size() <= 6 && (l.size() <= 0 || value(l[0])) && (l.size() <= 1 || value(l[1])) && (l.size() <= 2 || value(l[2])) && (l.size() <= 3 || value(l[3])) && (l.size() <= 4 || value(l[4])) && (l.size() <= 5 || value(l[5]));
+    }
+    function validTransport(d) {
+      let l = d.points;
+      return d.keys().hasOnly(['title', 'intro', 'deliveryTitle', 'deliveryText', 'hireTitle', 'hireText', 'points'])
+        && str(d.title, 100) && str(d.intro, 800) && str(d.deliveryTitle, 100) && str(d.deliveryText, 800)
+        && str(d.hireTitle, 100) && str(d.hireText, 800)
+        && l is list && l.size() <= 6 && (l.size() <= 0 || line(l[0])) && (l.size() <= 1 || line(l[1])) && (l.size() <= 2 || line(l[2])) && (l.size() <= 3 || line(l[3])) && (l.size() <= 4 || line(l[4])) && (l.size() <= 5 || line(l[5]));
+    }
+
+    // ---------- collections ----------
+    match /site/{doc} {
+      allow read: if true;
+      allow delete: if false;
+      allow create, update: if isOwner() && (
+        (doc == 'settings' && validSettings(request.resource.data)) ||
+        (doc == 'home' && validHome(request.resource.data)) ||
+        (doc == 'about' && validAbout(request.resource.data)) ||
+        (doc == 'transport' && validTransport(request.resource.data)));
+    }
+    match /categories/{id} {
+      allow read: if true;
+      allow create, update: if isOwner() && id.size() <= 40 && validCategory(request.resource.data);
+      allow delete: if isOwner();
+    }
+    match /items/{id} {
+      // Hidden items are readable only by the owner. The website asks only for visible == true.
+      allow read: if resource.data.visible == true || isOwner();
+      allow create, update: if isOwner() && id.size() <= 40 && validItem(request.resource.data);
+      allow delete: if isOwner();
+    }
+    match /media/{id} {
+      // Full-size photos, fetched one by one by id. Listing them all is owner-only.
+      allow get: if true;
+      allow list: if isOwner();
+      allow create, update: if isOwner() && id.size() <= 40
+        && request.resource.data.keys().hasOnly(['data'])
+        && request.resource.data.data is string && request.resource.data.data.size() < 1000000
+        && request.resource.data.data.matches('^data:image/(webp|jpeg|png);base64,[A-Za-z0-9+/=]+$');
+      allow delete: if isOwner();
+    }
+
+    // Everything else is closed.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
