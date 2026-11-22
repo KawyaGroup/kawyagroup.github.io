@@ -3,9 +3,9 @@ import {
   MODE, adminApi, SECTIONS, DEFAULTS, normItem, normCategory, normSettings, normHome, normAbout, normTransport,
   safeImg, ID_RE, newId, str, mapEmbed, safeMapLink, digits,
   getMedia,
-} from './data.js?v=202611221052';
-import { h } from './ui.js?v=202611221052';
-import { makeStudioImage, listImageModels, DEFAULT_MODEL, MODEL_RE, KEY_RE } from './ai.js?v=202611221052';
+} from './data.js?v=202611221101';
+import { h } from './ui.js?v=202611221101';
+import { makeStudioImage, listImageModels, DEFAULT_MODEL, MODEL_RE, KEY_RE } from './ai.js?v=202611221101';
 
 // Refuse to run inside a frame (clickjacking protection; GitHub Pages cannot send frame-ancestors headers).
 if (window.top !== window.self) { document.documentElement.replaceChildren(); throw new Error('Admin cannot be framed'); }
@@ -92,6 +92,33 @@ function selectBox(title, label, options, value) {
     const close = overlay(m, () => { if (!done) res(null); });
     m.append(h('div', { class: 'acts' }, h('button', { class: 'b ghost', type: 'button', onclick: () => close() }, 'Cancel'), h('button', { class: 'b pri', type: 'submit' }, 'Move')));
     m.addEventListener('submit', e => { e.preventDefault(); done = true; res(sel.value); close(); });
+  });
+}
+// Create a category (or sub-category) on the spot, e.g. from the item editor. Resolves to the new category or null.
+function newCategoryBox(sec, parent = '') {
+  return new Promise(res => {
+    let done = false;
+    const name = h('input', { maxlength: '60', placeholder: 'e.g. Box Culverts' });
+    const where = h('select', null, h('option', { value: '' }, '(Top level)'), treeOptions(sec).map(o => h('option', { value: o.v, selected: o.v === parent }, o.t)));
+    const err = h('p', { class: 'err' });
+    const save = h('button', { class: 'b pri', type: 'submit' }, 'Create');
+    const m = h('form', { class: 'modal', role: 'dialog', 'aria-modal': 'true' }, h('h3', null, 'New category'),
+      h('p', null, 'In ' + SEC_LABEL[sec] + '. Pick a category below to make this a sub-category of it.'),
+      h('label', { class: 'f' }, h('span', null, 'Name'), name), h('label', { class: 'f' }, h('span', null, 'Put it inside'), where), err);
+    const close = overlay(m, () => { if (!done) res(null); });
+    m.append(h('div', { class: 'acts' }, h('button', { class: 'b ghost', type: 'button', onclick: () => close() }, 'Cancel'), save));
+    m.addEventListener('submit', async e => {
+      e.preventDefault();
+      const n = name.value.trim(); if (!n) { name.focus(); return; }
+      const p = where.value;
+      if (D.categories.some(c => c.section === sec && c.parent === p && c.name.toLowerCase() === n.toLowerCase())) { err.textContent = 'That category already exists there.'; return; }
+      save.disabled = true; err.textContent = '';
+      const order = Math.max(0, ...D.categories.filter(c => c.section === sec && c.parent === p).map(c => c.order)) + 1;
+      const c = normCategory({ id: newId(), name: n, section: sec, parent: p, order });
+      try { await api.saveDoc('categories', c.id, catDoc(c)); D.categories.push(c); done = true; toast('Category “' + n + '” created.'); res(c); close(); }
+      catch (x) { err.textContent = errMsg(x); save.disabled = false; }
+    });
+    setTimeout(() => name.focus(), 50);
   });
 }
 
@@ -496,8 +523,19 @@ function editItem(it, sec) {
   const name = textF('Name *', cur.name, { max: 120, ph: 'e.g. Hume Pipe 600 mm' });
   const secSel = h('select', null, SECTIONS.map(s => h('option', { value: s, selected: s === cur.section }, SEC_LABEL[s])));
   const catSel = h('select');
-  const fillCats = () => { const opts = treeOptions(secSel.value); catSel.replaceChildren(h('option', { value: '' }, '— No category —'), ...opts.map(o => h('option', { value: o.v, selected: o.v === cur.category }, o.t))); };
+  const fillCats = () => {
+    const opts = treeOptions(secSel.value);
+    catSel.replaceChildren(h('option', { value: '' }, '— No category —'), ...opts.map(o => h('option', { value: o.v, selected: o.v === cur.category }, o.t)), h('option', { value: '__new' }, '+ New category…'));
+    catSel.value = cur.category || '';
+  };
+  const makeCat = async () => {
+    const c = await newCategoryBox(secSel.value, cur.category || '');
+    if (c) cur.category = c.id;
+    fillCats(); local = true;
+  };
   fillCats(); secSel.addEventListener('change', () => { cur.category = ''; fillCats(); });
+  catSel.addEventListener('change', () => { if (catSel.value === '__new') makeCat(); else cur.category = catSel.value; });
+  const newCatBtn = h('button', { class: 'linkb', type: 'button', onclick: makeCat }, '+ New');
   const summary = textF('Short description (on cards)', cur.summary, { max: 200, area: true, hint: 'One or two lines.' });
   const desc = textF('Full description', cur.description, { max: 3000, area: true });
   const specs = rowsF('Details (size, capacity, strength…)', cur.specs, { keys: ['k', 'v'], ph: ['e.g. Diameter', 'e.g. 600 mm'], max: 12, lens: [40, 80] });
@@ -508,7 +546,7 @@ function editItem(it, sec) {
   const hire = toggleF('Available for hire', cur.hire, 'For vehicles');
   const vis = toggleF('Visible on website', cur.visible);
   const body = h('div', { class: 'body' },
-    name.el, h('div', { class: 'row2' }, h('label', { class: 'f' }, h('span', null, 'Section'), secSel), h('label', { class: 'f' }, h('span', null, 'Category'), catSel)),
+    name.el, h('div', { class: 'row2' }, h('label', { class: 'f' }, h('span', null, 'Section'), secSel), h('div', { class: 'f' }, h('span', { class: 'frow' }, 'Category', newCatBtn), catSel)),
     summary.el, desc.el, h('p', { class: 'sect' }, 'Photos'), imgs.el, h('p', { class: 'sect' }, 'Details'), specs.el,
     h('p', { class: 'sect' }, 'Options'), badge.el, sls.el, feat.el, hire.el, vis.el);
   const err = h('span', { class: 'err', style: { marginRight: 'auto', alignSelf: 'center' } });

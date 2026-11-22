@@ -236,3 +236,8 @@ p { margin: 0; }
 .scrim.top { z-index: 65; }
 
 [hidden] { display: none !important; }
+
+/* "+ New" category link in the item editor */
+.frow { display: flex; align-items: center; justify-content: space-between; gap: 8px; font: 500 12.5px/1 var(--body); color: var(--txt2); }
+.linkb { font-size: 12.5px; font-weight: 600; color: var(--accent); padding: 2px 4px; border-radius: 6px; }
+.linkb:hover { text-decoration: underline; }
