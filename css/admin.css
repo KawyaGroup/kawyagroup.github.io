@@ -234,3 +234,5 @@ p { margin: 0; }
 @media (max-width: 600px) { .aicmp { grid-template-columns: 1fr; } }
 
 .scrim.top { z-index: 65; }
+
+[hidden] { display: none !important; }
