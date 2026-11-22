@@ -3,9 +3,9 @@ import {
   MODE, adminApi, SECTIONS, DEFAULTS, normItem, normCategory, normSettings, normHome, normAbout, normTransport,
   safeImg, ID_RE, newId, str, mapEmbed, safeMapLink, digits,
   getMedia,
-} from './data.js?v=202611221116';
-import { h } from './ui.js?v=202611221116';
-import { makeStudioImage, listImageModels, DEFAULT_MODEL, MODEL_RE, KEY_RE } from './ai.js?v=202611221116';
+} from './data.js?v=202611221117';
+import { h } from './ui.js?v=202611221117';
+import { makeStudioImage, listImageModels, DEFAULT_MODEL, MODEL_RE, KEY_RE } from './ai.js?v=202611221117';
 
 // Refuse to run inside a frame (clickjacking protection; GitHub Pages cannot send frame-ancestors headers).
 if (window.top !== window.self) { document.documentElement.replaceChildren(); throw new Error('Admin cannot be framed'); }

@@ -675,3 +675,8 @@ main { min-height: 70vh; outline: none; }
   .heroscreen { min-height: auto; }
   .heroscreen .curve { height: 300px; }
 }
+
+/* no yard photos: keep the headline centred on the first screen */
+.heroscreen.solo { justify-content: center; padding-bottom: 6vh; }
+.heroscreen.solo .hero { padding-top: 0; }
+@media (max-width: 700px) { .heroscreen.solo { min-height: 78svh; } }

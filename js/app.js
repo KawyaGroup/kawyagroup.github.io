@@ -1,5 +1,5 @@
-import { cachedSite, loadSite, fullSrc, SECTIONS, telHref, waHref, mailHref, mapEmbed, ID_RE } from './data.js?v=202611221116';
-import { h, icon } from './ui.js?v=202611221116';
+import { cachedSite, loadSite, fullSrc, SECTIONS, telHref, waHref, mailHref, mapEmbed, ID_RE } from './data.js?v=202611221117';
+import { h, icon } from './ui.js?v=202611221117';
 
 const $ = (s, r = document) => r.querySelector(s);
 const main = $('#main');
@@ -159,7 +159,7 @@ function pageHome(v) {
     h('h1', null, words('span', H.heroLine1, 'serif', .1), words('span', H.heroLine2, '', .25)),
     R(h('p', { class: 'sub' }, H.heroSub), '', .45),
     R(h('div', { class: 'ctas' }, arrowBtn('View products', '#/products'), arrowBtn('Contact us', '#/contact', 'btn-light')), '', .55));
-  v.append(h('div', { class: 'heroscreen' }, hero, H.gallery.length ? R(curve(H.gallery), 'fade', .3) : null));
+  v.append(h('div', { class: 'heroscreen' + (H.gallery.length ? '' : ' solo') }, hero, H.gallery.length ? R(curve(H.gallery), 'fade', .3) : null));
 
   const trio = h('div', { class: 'trio wrap' }, SECTIONS.map((k, i) =>
     R(h('a', { href: k === 'transport' ? '#/transport' : '#/products/' + k }, h('h3', null, H.sections[k].title), h('p', null, H.sections[k].text)), '', .12 * i)));
