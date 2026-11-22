@@ -6,7 +6,7 @@
 export const DEFAULT_MODEL = 'gemini-2.5-flash-image';
 const API = 'https://generativelanguage.googleapis.com/v1beta';
 export const MODEL_RE = /^[a-z0-9][a-z0-9.\-]{1,79}$/;
-export const KEY_RE = /^[A-Za-z0-9_\-]{20,200}$/;
+export const KEY_RE = /^[A-Za-z0-9._\-]{20,200}$/; // classic "AIza…" keys and newer "AQ.…" keys
 
 export const PROMPT = [
   'Turn this photo into a clean, minimal e-commerce studio product image.',
