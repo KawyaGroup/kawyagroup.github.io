@@ -2,8 +2,10 @@
 import {
   MODE, adminApi, SECTIONS, DEFAULTS, normItem, normCategory, normSettings, normHome, normAbout, normTransport,
   safeImg, ID_RE, newId, str, mapEmbed, safeMapLink, digits,
+  getMedia,
 } from './data.js';
 import { h } from './ui.js';
+import { makeStudioImage, listImageModels, DEFAULT_MODEL, MODEL_RE, KEY_RE } from './ai.js';
 
 // Refuse to run inside a frame (clickjacking protection; GitHub Pages cannot send frame-ancestors headers).
 if (window.top !== window.self) { document.documentElement.replaceChildren(); throw new Error('Admin cannot be framed'); }
@@ -53,7 +55,7 @@ function errMsg(e) {
   return (e && e.message && e.message.length < 140) ? e.message : 'Something went wrong. Please try again.';
 }
 function overlay(node, onClose, guard) {
-  const scrim = h('div', { class: 'scrim' });
+  const scrim = h('div', { class: 'scrim' + (node.classList.contains('modal') ? ' top' : '') });
   const close = () => { scrim.remove(); node.remove(); document.removeEventListener('keydown', key); onClose && onClose(); };
   const ask = () => (guard ? guard() : close());
   const key = e => { if (e.key === 'Escape' && document.body.lastElementChild === node) ask(); };
@@ -164,7 +166,7 @@ async function processImage(file) {
   const bmp = await decode(file);
   return { t: encode(bmp, 520, 48000), full: encode(bmp, 1600, 880000), m: '', c: isCutout(bmp), label: '' };
 }
-function imagesF(label, list, { max = 8, labels = false, hint = '', single = false } = {}) {
+function imagesF(label, list, { max = 8, labels = false, hint = '', single = false, ai = false } = {}) {
   let arr = (list || []).filter(o => o && (o.t || o.m)).map(o => ({ ...o }));
   const box = h('div', { class: 'imgs' + (single ? ' round' : '') });
   const file = h('input', { type: 'file', accept: OK_TYPES.join(','), multiple: !single, hidden: true });
@@ -174,6 +176,7 @@ function imagesF(label, list, { max = 8, labels = false, hint = '', single = fal
       const im = h('img', { alt: '' }); im.src = safeImg(o.t) || 'assets/img/mark.svg'; if (/^data:/.test(o.t) && !o.c) im.className = 'photo';
       const t = h('div', { class: 'ti' }, im, h('button', { class: 'x', type: 'button', 'aria-label': 'Remove photo', onclick: () => { arr.splice(i, 1); draw(); markDirty(); } }, '×'));
       if (!single && i === 0) t.append(h('span', { class: 'first' }, 'Main'));
+      if (ai && (/^data:/.test(o.t) || o.m)) t.append(h('button', { class: 'aib', type: 'button', title: 'Make an AI studio image', 'aria-label': 'Make an AI studio image', onclick: () => studioFor(o, nu => { arr[i] = nu; draw(); markDirty(); }) }, '✦ AI'));
       if (labels) { const li = h('input', { value: o.label || '', placeholder: 'Label', maxlength: '80' }); li.addEventListener('input', () => { o.label = li.value; }); t.append(li); }
       else if (!single && arr.length > 1) t.append(h('div', { class: 'mv' },
         i > 0 ? h('button', { type: 'button', 'aria-label': 'Move left', onclick: () => { [arr[i - 1], arr[i]] = [arr[i], arr[i - 1]]; draw(); markDirty(); } }, '‹') : null,
@@ -207,6 +210,61 @@ async function commitImages(arr) {
 }
 const mediaIds = list => (list || []).map(o => o && o.m).filter(m => m && ID_RE.test(m));
 async function dropMedia(ids) { for (const id of ids) { try { await api.removeMedia(id); } catch (e) { /* leftover media is harmless */ } } }
+
+/* ------------------------------------------------------------------ */
+/* AI studio image                                                     */
+/* ------------------------------------------------------------------ */
+let aiCfg = null;
+async function getAiCfg() {
+  if (aiCfg) return aiCfg;
+  try { const d = await api.getPrivate('ai'); aiCfg = d && KEY_RE.test(d.key || '') ? { key: d.key, model: MODEL_RE.test(d.model || '') ? d.model : DEFAULT_MODEL } : null; }
+  catch (e) { aiCfg = null; }
+  return aiCfg;
+}
+function loadImg(src) { return new Promise((res, rej) => { const im = new Image(); im.onload = () => res(im); im.onerror = () => rej(new Error('Could not read the AI image.')); im.src = src; }); }
+async function studioFor(o, onUse) {
+  const cfg = await getAiCfg();
+  if (!cfg) { toast('Add your Google AI Studio API key first: Account › AI images.', true); return; }
+  let src = o.full || '';
+  if (!src && o.m) src = await getMedia(o.m);
+  if (!src && /^data:/.test(o.t)) src = o.t;
+  if (!src) { toast('This photo cannot be used with AI. Upload a real photo first.', true); return; }
+  const orig = h('img', { alt: 'Your photo' }); orig.src = src;
+  const out = h('div', { class: 'aiout' }, h('div', { class: 'spinner' }));
+  const status = h('p', { class: 'aistat' }, 'Making the studio image… this can take 10–30 seconds.');
+  const extra = h('input', { maxlength: '300', placeholder: 'Optional extra instruction, e.g. “keep the label text exactly”' });
+  const useBtn = h('button', { class: 'b pri', disabled: true }, 'Use AI image');
+  const again = h('button', { class: 'b ghost', disabled: true }, 'Try again');
+  const m = h('div', { class: 'modal aimodal', role: 'dialog', 'aria-modal': 'true' },
+    h('h3', null, 'AI studio image'),
+    h('p', { class: 'aiwarn' }, 'Check carefully before using it: shape, size, colour, holes, edges and any printed text must match the real product exactly. AI can make small mistakes.'),
+    h('div', { class: 'aicmp' }, h('figure', null, orig, h('figcaption', null, 'Your photo')), h('figure', null, out, h('figcaption', null, 'AI studio image'))),
+    status, h('label', { class: 'f', style: { marginTop: '6px' } }, extra),
+    h('div', { class: 'acts' }, h('button', { class: 'b ghost', onclick: () => close() }, 'Cancel'), again, useBtn));
+  let result = '', alive = true;
+  const close = overlay(m, () => { alive = false; });
+  const run = async () => {
+    useBtn.disabled = true; again.disabled = true; result = '';
+    out.replaceChildren(h('div', { class: 'spinner' })); status.textContent = 'Making the studio image… this can take 10–30 seconds.'; status.classList.remove('bad');
+    try {
+      const r = await makeStudioImage(cfg, src, extra.value.trim());
+      if (!alive) return;
+      const im = await loadImg(r);
+      result = r; out.replaceChildren(im); status.textContent = 'Compare both pictures. Use it only if the product looks exactly the same.';
+      useBtn.disabled = false;
+    } catch (e) { if (!alive) return; out.replaceChildren(h('span', { class: 'aifail' }, '—')); status.textContent = e.message || 'The AI request failed.'; status.classList.add('bad'); }
+    again.disabled = false;
+  };
+  again.addEventListener('click', run);
+  useBtn.addEventListener('click', async () => {
+    try {
+      const im = await loadImg(result);
+      onUse({ t: encode(im, 520, 48000), full: encode(im, 1600, 880000), m: '', c: true, label: o.label || '' });
+      close(); toast('AI studio image added. Press Save to keep it.');
+    } catch (e) { toast(e.message || 'Could not use that image.', true); }
+  });
+  run();
+}
 
 /* ------------------------------------------------------------------ */
 /* Dirty tracking                                                      */
@@ -329,13 +387,16 @@ const wd = (title, kids, cls = '', d = 0) => { const w = h('section', { class: '
 function pOverview() {
   top('Overview', 'Signed in as ' + (user && user.email), viewSite());
   const g = h('div', { class: 'grid' });
-  if (D._empty) {
-    g.append(wd('Publish the starting content', [h('p', { class: 'sub', style: { margin: '0 0 16px' } }, 'Your database is empty, so the website is showing the built-in sample content. Publish it once to start editing it here.'),
+  const noCatalog = !D.items.length && !D.categories.length;
+  if (D._empty || noCatalog) {
+    g.append(wd(D._empty ? 'Publish the starting content' : 'Add the sample products', [h('p', { class: 'sub', style: { margin: '0 0 16px' } }, D._empty
+      ? 'Your database is empty, so the website is showing the built-in sample content. Publish it once to start editing it here.'
+      : 'There are no products or categories yet. Add the sample categories and products as a starting point, then edit or delete them. Your saved pages are not changed.'),
       h('button', { class: 'b pri', onclick: async e => {
         e.target.disabled = true;
-        try { await publishDefaults(); D = await api.loadAll(); toast('Starting content published.'); render(); }
+        try { await publishDefaults(!D._empty); D = await api.loadAll(); toast('Sample products added.'); render(); }
         catch (x) { toast(errMsg(x), true); e.target.disabled = false; }
-      } }, 'Publish starting content')], 'wide'));
+      } }, D._empty ? 'Publish starting content' : 'Add sample products')], 'wide'));
   }
   const stat = (icon, n, label, k, d) => { const w = wd('', h('button', { class: 'stat', style: { width: '100%', textAlign: 'left' }, onclick: () => go(k) }, h('span', { class: 'dot' }, svg(icon)), h('div', null, h('b', null, String(n)), h('span', null, label))), '', d); return w; };
   g.append(
@@ -353,11 +414,12 @@ function pOverview() {
   if (hidden) g.append(wd('Hidden items', h('p', { class: 'sub', style: { margin: 0 } }, `${hidden} item${hidden > 1 ? 's are' : ' is'} hidden from the website.`), '', .2));
   mainEl.append(g);
 }
-async function publishDefaults() {
+async function publishDefaults(catalogOnly = false) {
   const ops = [];
   for (const c of DEFAULTS.categories) { const { id, ...rest } = normCategory(c); ops.push({ col: 'categories', id, data: rest }); }
   for (const i of DEFAULTS.items) { const { id, ...rest } = normItem(i); rest.images = rest.images.map(cleanImg); ops.push({ col: 'items', id, data: rest }); }
   await api.batch(ops);
+  if (catalogOnly) return;
   await api.saveSite('settings', normSettings(DEFAULTS.settings));
   await api.saveSite('home', siteDoc('home', normHome(DEFAULTS.home)));
   await api.saveSite('about', siteDoc('about', normAbout(DEFAULTS.about)));
@@ -439,7 +501,7 @@ function editItem(it, sec) {
   const summary = textF('Short description (on cards)', cur.summary, { max: 200, area: true, hint: 'One or two lines.' });
   const desc = textF('Full description', cur.description, { max: 3000, area: true });
   const specs = rowsF('Details (size, capacity, strength…)', cur.specs, { keys: ['k', 'v'], ph: ['e.g. Diameter', 'e.g. 600 mm'], max: 12, lens: [40, 80] });
-  const imgs = imagesF('Photos', cur.images, { max: 8, hint: 'First photo is the main one. Photos with a plain white or transparent background look best.' });
+  const imgs = imagesF('Photos', cur.images, { max: 8, ai: true, hint: 'First photo is the main one. Press ✦ AI on a photo to make a clean studio image (you check it before it is used).' });
   const badge = textF('Badge (optional)', cur.badge, { max: 24, ph: 'e.g. New, Best seller, For hire' });
   const sls = toggleF('SLS certified', cur.sls, 'Shows the SLS badge');
   const feat = toggleF('Show on home page', cur.featured, 'In the “Popular items” row');
@@ -689,6 +751,48 @@ function pContact() {
 /* ------------------------------------------------------------------ */
 /* Account                                                             */
 /* ------------------------------------------------------------------ */
+function aiSettings() {
+  const key = h('input', { type: 'password', autocomplete: 'off', spellcheck: 'false', placeholder: 'Paste the Google AI Studio API key', maxlength: '200' });
+  const model = h('select', null, h('option', { value: DEFAULT_MODEL }, DEFAULT_MODEL));
+  const state = h('p', { class: 'sub', style: { margin: '0 0 14px' } }, 'Loading…');
+  const save = h('button', { class: 'b pri' }, 'Check & save');
+  const remove = h('button', { class: 'b red' }, 'Remove key');
+  getAiCfg().then(c => {
+    state.textContent = c ? 'A key is saved. The ✦ AI button appears on product photos.' : 'No key saved yet.';
+    if (c) { model.replaceChildren(h('option', { value: c.model }, c.model)); }
+    remove.hidden = !c;
+  });
+  save.addEventListener('click', async () => {
+    const k = key.value.trim() || (aiCfg && aiCfg.key) || '';
+    if (!KEY_RE.test(k)) { toast('That does not look like an API key.', true); return; }
+    save.disabled = true; save.textContent = 'Checking…';
+    try {
+      const models = await listImageModels(k);
+      if (models.length) {
+        const pick = models.includes(model.value) ? model.value : (models.includes(DEFAULT_MODEL) ? DEFAULT_MODEL : models[0]);
+        model.replaceChildren(...models.map(n => h('option', { value: n, selected: n === pick }, n)));
+      }
+      const m = MODEL_RE.test(model.value) ? model.value : DEFAULT_MODEL;
+      await api.savePrivate('ai', { key: k, model: m });
+      aiCfg = { key: k, model: m }; key.value = '';
+      state.textContent = 'Saved. ' + (models.length ? models.length + ' image model(s) found on this key.' : 'No image models were listed for this key; generation may not work.');
+      remove.hidden = false; toast('AI key saved.');
+    } catch (e) { toast(e.message || errMsg(e), true); }
+    save.disabled = false; save.textContent = 'Check & save';
+  });
+  model.addEventListener('change', async () => {
+    if (!aiCfg || !MODEL_RE.test(model.value)) return;
+    try { await api.savePrivate('ai', { key: aiCfg.key, model: model.value }); aiCfg.model = model.value; toast('Model changed.'); } catch (e) { toast(errMsg(e), true); }
+  });
+  remove.addEventListener('click', async () => {
+    if (!(await confirmBox('Remove the AI key?', 'The ✦ AI button will stop working until you add a key again.', 'Remove'))) return;
+    try { await api.savePrivate('ai', { key: '', model: DEFAULT_MODEL }); aiCfg = null; state.textContent = 'No key saved yet.'; remove.hidden = true; toast('AI key removed.'); } catch (e) { toast(errMsg(e), true); }
+  });
+  return wd('AI images', [state,
+    h('label', { class: 'f' }, h('span', null, 'Google AI Studio API key'), key, h('small', null, 'Only this admin account can read it. Get one at aistudio.google.com › Get API key.')),
+    h('label', { class: 'f' }, h('span', null, 'Image model'), model),
+    h('div', { style: { display: 'flex', gap: '8px', flexWrap: 'wrap' } }, save, remove)], 'wide', .08);
+}
 function pAccount() {
   top('Account', 'Your sign-in.');
   const g = h('div', { class: 'grid' });
@@ -699,6 +803,7 @@ function pAccount() {
     h('li', null, 'You are signed out when you close the browser tab, or after 30 minutes without activity.'),
     h('li', null, 'Only the owner account listed in the Firestore rules can change the website.'),
     h('li', null, 'Never share your password. Kawya Group staff will never ask for it.')), '', .05));
+  g.append(aiSettings());
   if (api.mode === 'demo') g.append(wd('Test data', [h('p', { class: 'sub', style: { margin: '0 0 16px' } }, 'Reset this browser’s test data back to the sample content.'),
     h('button', { class: 'b red', onclick: async () => { if (await confirmBox('Reset test data?', 'All test changes in this browser will be lost.', 'Reset')) { localStorage.removeItem('kawya-demo-db-v1'); D = await api.loadAll(); toast('Test data reset.'); render(); } } }, 'Reset test data')], '', .1));
   mainEl.append(g);

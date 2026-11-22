@@ -215,3 +215,22 @@ p { margin: 0; }
   .savebar { bottom: 86px; }
 }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; } }
+
+/* AI studio image */
+.imgs .ti .aib { position: absolute; right: 5px; bottom: 5px; height: 24px; padding: 0 8px; border-radius: 8px; background: rgba(255,255,255,.92); color: #121212; font-size: 11px; font-weight: 700; box-shadow: 0 2px 6px rgba(0,0,0,.25); transition: transform .45s var(--spring); }
+.imgs .ti .aib:hover { transform: scale(1.06); }
+.aimodal { width: min(820px, calc(100% - 24px)); max-height: calc(100vh - 32px); overflow: auto; }
+.aiwarn { background: rgba(242,183,5,.12); color: #F5D57A !important; border-radius: 12px; padding: 10px 12px; font-size: 13px; }
+.aicmp { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.aicmp figure { margin: 0; }
+.aicmp img, .aiout { width: 100%; aspect-ratio: 1; object-fit: contain; border-radius: 16px; background: #fff; display: grid; place-items: center; }
+.aiout img { width: 100%; height: 100%; object-fit: contain; border-radius: 16px; }
+.aiout .spinner { border-color: rgba(0,0,0,.12); border-top-color: #121212; }
+.aicmp figcaption { font-size: 12.5px; color: var(--txt2); margin-top: 6px; text-align: center; }
+.aistat { margin: 12px 0 4px !important; font-size: 13px; }
+.aistat.bad { color: #FF8A80 !important; }
+.aifail { color: #999; font-size: 30px; }
+.aimodal .f input { width: 100%; background: var(--w2); border: 1px solid transparent; border-radius: 12px; padding: 11px 13px; color: var(--txt); outline: none; }
+@media (max-width: 600px) { .aicmp { grid-template-columns: 1fr; } }
+
+.scrim.top { z-index: 65; }

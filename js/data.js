@@ -330,6 +330,8 @@ export async function adminApi() {
       async batch(ops) { const db = demoDb(); for (const o of ops) { if (o.del) delete db[o.col][o.id]; else db[o.col][o.id] = o.data; } demoSave(db); },
       async addMedia(dataUrl) { const db = demoDb(); const id = newId(); db.media[id] = dataUrl; demoSave(db); mediaCache.delete(id); return id; },
       async removeMedia(id) { const db = demoDb(); delete db.media[id]; demoSave(db); mediaCache.delete(id); },
+      async getPrivate(name) { const db = demoDb(); return (db.private && db.private[name]) || null; },
+      async savePrivate(name, data) { const db = demoDb(); db.private = db.private || {}; db.private[name] = data; demoSave(db); },
     };
   }
   if (MODE !== 'firebase') return null;
@@ -357,5 +359,7 @@ export async function adminApi() {
     },
     async addMedia(dataUrl) { const id = newId(); await fs.setDoc(fs.doc(db, 'media', id), { data: dataUrl }); return id; },
     async removeMedia(id) { mediaCache.delete(id); await fs.deleteDoc(fs.doc(db, 'media', id)); },
+    async getPrivate(name) { const s = await fs.getDoc(fs.doc(db, 'private', name)); return s.exists() ? s.data() : null; },
+    savePrivate: (name, data) => fs.setDoc(fs.doc(db, 'private', name), data),
   };
 }

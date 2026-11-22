@@ -64,7 +64,7 @@ function movePill() {
   pill.style.transform = `translateX(${on.offsetLeft}px)`;
 }
 addEventListener('resize', movePill);
-if (document.fonts) document.fonts.ready.then(() => { movePill(); const sg = $('.segs'); if (sg) movePillIn(sg); });
+if (document.fonts) document.fonts.ready.then(movePill);
 const burger = $('#burger'), sheet = $('#sheet');
 function closeSheet() { sheet.hidden = true; burger.setAttribute('aria-expanded', 'false'); document.body.style.overflow = ''; }
 burger.addEventListener('click', () => {
@@ -74,31 +74,25 @@ burger.addEventListener('click', () => {
   if (open) sheet.querySelectorAll('a').forEach(a => { a.style.animation = 'none'; void a.offsetWidth; a.style.animation = ''; });
 });
 addEventListener('keydown', e => { if (e.key === 'Escape') { closeSheet(); const lb = $('.lb'); if (lb) lb.remove(); } });
-// hide nav on scroll down, show on scroll up
-let lastY = 0;
-addEventListener('scroll', () => {
-  const y = scrollY; const nav = $('#nav');
-  nav.classList.toggle('hide', y > 300 && y > lastY + 4 && sheet.hidden);
-  if (y < lastY - 4 || y < 300) nav.classList.remove('hide');
-  lastY = y;
-}, { passive: true });
+// the top bar always stays visible (no hide/show on scroll, which made scrolling feel jumpy)
 
 /* ------------------------------------------------------------------ */
 /* Reveal on scroll                                                    */
 /* ------------------------------------------------------------------ */
 const io = new IntersectionObserver(es => es.forEach(e => {
   if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); if (e.target.dataset.count != null) countUp(e.target); }
-}), { rootMargin: '0px 0px -8% 0px', threshold: 0.08 });
+}), { rootMargin: '0px 0px -6% 0px', threshold: 0 });
 function observe(root) {
   root.querySelectorAll('[data-r], .words, [data-count]').forEach(el => (reduce ? (el.classList.add('in')) : io.observe(el)));
 }
 const R = (el, kind = '', d = 0) => { el.dataset.r = kind; if (d) el.style.setProperty('--d', d + 's'); return el; };
-function words(tag, text, cls = '', base = 0) {
+function words(tag, text, cls = '', base = 0, grey = 0) {
   const el = h(tag, { class: 'words ' + cls });
-  text.split(/(\s+)/).forEach((w, i) => {
-    if (/^\s+$/.test(w)) { el.append(' '); return; }
-    const inner = h('span', null, w); inner.style.setProperty('--d', (base + i * 0.035).toFixed(3) + 's');
-    el.append(h('span', { class: 'w' }, inner));
+  const parts = text.split(/\s+/).filter(Boolean);
+  parts.forEach((w, i) => {
+    if (i) el.append(' ');
+    const inner = h('span', null, w); inner.style.setProperty('--d', (base + i * 0.07).toFixed(3) + 's');
+    el.append(h('span', { class: 'w' + (grey && i >= parts.length - Math.min(grey, parts.length - 1) ? ' g' : '') }, inner));
   });
   return el;
 }
@@ -179,7 +173,7 @@ function pageHome(v) {
   // Bento
   const img3 = H.gallery[2] || H.gallery[0];
   const bento = h('section', { class: 'sec wrap' },
-    h('div', { class: 'sec-head' }, words('h2', 'Everything your build needs, from one yard'), R(h('p', null, 'Three businesses that work together, so your materials are made, moved and supplied by the same people.'), '', .2)),
+    h('div', { class: 'sec-head' }, words('h2', 'Everything your build needs, from one yard', '', 0, 3), R(h('p', null, 'Three businesses that work together, so your materials are made, moved and supplied by the same people.'), '', .2)),
     h('div', { class: 'bento' },
       R(h('a', { class: 'tile photo big', href: '#/products/concrete' }, h('div', { class: 'bg' }, img3 ? pic(img3, '') : null), h('span', { class: 'go' }), h('h3', null, H.sections.concrete.title), h('p', null, H.sections.concrete.text)), 'scale'),
       R(h('a', { class: 'tile sand', href: '#/transport' }, h('img', { class: 'art', src: 'assets/img/p-truck.svg', alt: '' }), h('span', { class: 'go' }), h('h3', null, H.sections.transport.title), h('p', null, H.sections.transport.text)), 'scale', .1),
@@ -191,7 +185,7 @@ function pageHome(v) {
   const list = (feat.length ? feat : S.items).slice(0, 10);
   if (list.length) {
     v.append(h('section', { class: 'wrap', style: { paddingBottom: '40px' } },
-      h('div', { class: 'rail-head' }, h('div', null, R(h('span', { class: 'eyebrow' }, 'From the yard'), ''), words('h2', 'Popular items')), R(arrowBtn('All products', '#/products', 'btn-light'), '', .1)),
+      h('div', { class: 'rail-head' }, h('div', null, R(h('span', { class: 'eyebrow' }, 'From the yard'), ''), words('h2', 'Popular items', '', 0, 1)), R(arrowBtn('All products', '#/products', 'btn-light'), '', .1)),
       h('div', { class: 'rail' }, list.map((it, i) => R(itemCard(it), '', i * .06)))));
   }
 
@@ -201,7 +195,7 @@ function pageHome(v) {
     arrowBtn('About our quality', '#/about', 'btn-light')), 'scale')));
 
   v.append(h('section', { class: 'wrap' },
-    h('div', { class: 'sec-head' }, words('h2', 'Visit our yard'), R(h('p', null, S.settings.address), '', .15)),
+    h('div', { class: 'sec-head' }, words('h2', 'Visit our yard', '', 0, 2), R(h('p', null, S.settings.address), '', .15)),
     R(h('div', { class: 'mapcard' }, mapFrame(),
       h('div', { class: 'float' }, h('span', { class: 'eyebrow' }, 'Kawya Group'), h('h3', null, 'Find us'), h('p', null, S.settings.address + (S.settings.hours ? ' · ' + S.settings.hours : '')),
         arrowBtn('Get directions', dirLink(), 'btn-dark', true))), 'scale')));
@@ -210,7 +204,7 @@ function pageHome(v) {
 }
 function cta() {
   return h('section', { class: 'cta wrap' },
-    words('h2', 'Let’s build something that lasts.'),
+    words('h2', 'Let’s build something that lasts.', '', 0, 2),
     R(h('p', null, 'Tell us what you need. We reply quickly on WhatsApp and phone.'), '', .2),
     R(h('div', { class: 'ctas', style: { display: 'flex', gap: '12px', justifyContent: 'center', flexWrap: 'wrap' } },
       arrowBtn('Chat on WhatsApp', waLink('Hello Kawya Group, I would like to ask about '), 'btn-dark', true), arrowBtn('All contact details', '#/contact', 'btn-light')), '', .3));
@@ -238,12 +232,15 @@ function curve(gallery) {
     });
     raf = requestAnimationFrame(tick);
   };
+  let visible = true;
+  const vio = new IntersectionObserver(([e]) => { const was = visible; visible = e.isIntersecting; if (visible && !was) raf = requestAnimationFrame(tick); else if (!visible) cancelAnimationFrame(raf); });
+  vio.observe(wrap);
   raf = requestAnimationFrame(tick);
   wrap.addEventListener('pointerdown', e => { drag = { x: e.clientX, off, last: e.clientX, t: performance.now() }; wrap.classList.add('drag'); wrap.setPointerCapture(e.pointerId); });
   wrap.addEventListener('pointermove', e => { if (!drag) return; off = drag.off - (e.clientX - drag.x); const now = performance.now(); vel = -(e.clientX - drag.last) / Math.max(8, now - drag.t) * 10; drag.last = e.clientX; drag.t = now; });
   const end = () => { drag = null; wrap.classList.remove('drag'); };
   wrap.addEventListener('pointerup', end); wrap.addEventListener('pointercancel', end);
-  cleanup.push(() => { cancelAnimationFrame(raf); ro.disconnect(); });
+  cleanup.push(() => { cancelAnimationFrame(raf); ro.disconnect(); vio.disconnect(); });
   return wrap;
 }
 
@@ -252,12 +249,12 @@ function curve(gallery) {
 /* ------------------------------------------------------------------ */
 function pageAbout(v) {
   const A = S.about, H = S.home;
-  v.append(h('section', { class: 'phead wrap' }, R(h('span', { class: 'eyebrow' }, 'About us'), 'blur'), words('h1', A.title), R(h('p', null, A.intro), '', .3)));
+  v.append(h('section', { class: 'phead wrap' }, R(h('span', { class: 'eyebrow' }, 'About us'), 'blur'), words('h1', A.title, '', 0, 2), R(h('p', null, A.intro), '', .3)));
 
   v.append(h('section', { class: 'sec wrap', style: { paddingTop: '40px' } }, h('div', { class: 'about-intro' },
     R(h('div', { class: 'pic' }, A.storyImage.t || A.storyImage.m ? pic(A.storyImage, 'Kawya Group yard') : null,
       h('span', { class: 'tag yardtag' }, h('span', { class: 'dot' }, h('img', { src: 'assets/img/mark.svg', alt: '' })), 'Our yard')), 'scale'),
-    h('div', { class: 'txt' }, R(h('span', { class: 'eyebrow' }, 'Our story'), ''), words('h2', 'Made in our yard. Delivered by our trucks.'), R(h('p', null, A.story), '', .2)))));
+    h('div', { class: 'txt' }, R(h('span', { class: 'eyebrow' }, 'Our story'), ''), words('h2', 'Made in our yard. Delivered by our trucks.', '', 0, 4), R(h('p', null, A.story), '', .2)))));
 
   // Boss
   const bp = A.bossPhoto;
@@ -268,7 +265,7 @@ function pageAbout(v) {
 
   // Services
   v.append(h('section', { class: 'sec wrap' },
-    h('div', { class: 'sec-head' }, words('h2', 'What we do'), R(h('p', null, 'Three services, one team you can count on.'), '', .15)),
+    h('div', { class: 'sec-head' }, words('h2', 'What we do', '', 0, 2), R(h('p', null, 'Three services, one team you can count on.'), '', .15)),
     h('div', { class: 'svc3' }, SECTIONS.map((k, i) => R(h('a', { class: 'svc', href: k === 'transport' ? '#/transport' : '#/products/' + k },
       h('span', { class: 'n' }, icon(SEC_ICON[k])), h('h3', null, H.sections[k].title), h('p', null, H.sections[k].text),
       h('span', { class: 'more' }, k === 'transport' ? 'See our fleet' : 'See products', ' →')), '', i * .08)))));
@@ -309,70 +306,61 @@ function setQuery(sec, cat, q) {
   productsUpdate(parseRoute());
 }
 function pageProducts(v, r) {
-  v.append(h('div', { class: 'mega', 'aria-hidden': 'true' }, h('span', null, 'Products')));
-  const top = h('div', { class: 'shop-top wrap' });
-  const shop = h('div', { class: 'shop wrap' });
-  v.append(h('h1', { class: 'wrap', style: { position: 'absolute', left: '-9999px' } }, 'Products'), top, shop);
-  // section tabs
-  const segs = h('div', { class: 'segs', role: 'tablist' }, h('span', { class: 'pill', 'aria-hidden': 'true' }));
-  SECTIONS.forEach(k => segs.append(h('button', { role: 'tab', 'data-sec': k, onclick: () => { history.replaceState(null, '', '#/products/' + k); productsUpdate(parseRoute()); } }, SEC_LABEL[k])));
-  const heading = h('h2');
-  top.append(heading, segs);
-  // filters
-  const filters = h('aside', { class: 'filters' });
-  const fbody = h('div', { class: 'fbody' });
+  const side = h('aside', { class: 'side' });
+  const toggle = h('button', { class: 'side-toggle', 'aria-expanded': 'false', onclick: () => { const o = side.classList.toggle('open'); toggle.setAttribute('aria-expanded', String(o)); } }, icon('filter'), h('span', null, 'Browse categories'), h('i', { class: 'chev', 'aria-hidden': 'true' }));
+  const tree = h('nav', { class: 'tree', 'aria-label': 'Product sections and categories' });
+  side.append(h('div', { class: 'side-logo' }, h('span', { class: 'disc' }, h('img', { src: 'assets/img/mark.svg', alt: '' })), h('div', null, h('b', null, 'Kawya'), h('span', null, 'Product range'))), toggle, tree);
+  const title = h('h1', { class: 'ptitle' });
   const search = h('input', { type: 'search', placeholder: 'Search products', 'aria-label': 'Search products', maxlength: '60' });
   let st; search.addEventListener('input', () => { clearTimeout(st); st = setTimeout(() => setQuery(P.sec, P.cat, search.value.trim()), 180); });
-  const toggle = h('button', { class: 'btn btn-light plain ftoggle', onclick: () => filters.classList.toggle('open') }, icon('filter'), 'Filter');
-  filters.append(h('div', { class: 'search' }, icon('search'), search), toggle, fbody);
-  const meta = h('div', { class: 'grid-meta' });
+  const crumbs = h('div', { class: 'pcrumbs' });
   const grid = h('div', { class: 'pgrid' });
-  shop.append(filters, h('div', null, meta, grid));
-  P = { segs, heading, fbody, search, meta, grid, sec: null, cat: null, q: null };
+  const pmain = h('div', { class: 'pmain' }, h('div', { class: 'phead2' }, title, h('label', { class: 'psearch' }, icon('search'), search)), crumbs, grid);
+  v.append(h('section', { class: 'pwrap wrap' }, h('div', { class: 'panel' }, side, pmain)));
+  P = { tree, title, search, crumbs, grid, side, sec: null, cat: null, q: null };
   productsUpdate(r, true);
-  requestAnimationFrame(() => movePillIn(segs));
-  const onR = () => movePillIn(segs); addEventListener('resize', onR); cleanup.push(() => { removeEventListener('resize', onR); P = null; });
-}
-function movePillIn(segs) {
-  const on = segs.querySelector('button.on'), pill = segs.querySelector('.pill');
-  if (on && pill) { pill.style.width = on.offsetWidth + 'px'; pill.style.transform = `translateX(${on.offsetLeft - 0}px)`; }
+  cleanup.push(() => { P = null; });
 }
 function productsUpdate(r, first = false) {
   if (!P) return;
-  let sec = SECTIONS.includes(r.parts[1]) ? r.parts[1] : 'concrete';
+  const sec = SECTIONS.includes(r.parts[1]) ? r.parts[1] : 'concrete';
   let cat = r.q.get('c') || ''; if (cat && !S.categories.some(c => c.id === cat && c.section === sec)) cat = '';
   const q = (r.q.get('q') || '').slice(0, 60);
   const changed = first || sec !== P.sec || cat !== P.cat || q !== P.q;
   P.sec = sec; P.cat = cat; P.q = q;
   if (document.activeElement !== P.search) P.search.value = q;
-  P.segs.querySelectorAll('button').forEach(b => { b.classList.toggle('on', b.dataset.sec === sec); b.setAttribute('aria-selected', String(b.dataset.sec === sec)); });
-  movePillIn(P.segs);
-  P.heading.textContent = cat ? catName(cat) : (S.home.sections[sec].title || SEC_LABEL[sec]);
-  // filter panel
-  const fb = P.fbody; fb.replaceChildren();
-  fb.append(h('p', { class: 'ft' }, 'Filter'));
   const path = cat ? pathTo(cat) : [];
-  if (path.length) {
-    fb.append(h('div', { class: 'crumbs' }, h('button', { onclick: () => setQuery(sec, '', q) }, 'All'), path.map((c, i) => [' / ', i < path.length - 1 ? h('button', { onclick: () => setQuery(sec, c.id, q) }, c.name) : h('span', null, c.name)])));
-  }
-  // one group per level along the path
-  const levels = [''].concat(path.map(c => c.id));
-  levels.forEach((parentId, li) => {
-    const list = kids(sec, parentId);
-    if (!list.length) return;
-    const title = li === 0 ? 'By category' : 'In ' + catName(parentId);
-    const selected = path[li] ? path[li].id : '';
-    fb.append(h('div', { class: 'fgroup' }, h('h4', null, title),
-      h('div', { class: 'chips' },
-        li === 0 ? h('button', { class: 'chip' + (!cat ? ' on' : ''), onclick: () => setQuery(sec, '', q) }, 'All', h('span', { class: 'c' }, countIn(sec, ''))) : null,
-        list.map(c => h('button', { class: 'chip' + (selected === c.id ? ' on' : ''), onclick: () => setQuery(sec, selected === c.id ? parentId : c.id, q) }, c.name, h('span', { class: 'c' }, countIn(sec, c.id)))))));
-  });
-  if (!kids(sec, '').length) fb.append(h('p', { class: 'muted', style: { fontSize: '14px' } }, 'No categories yet.'));
-  // grid
+  const onPath = new Set(path.map(c => c.id));
+  // sidebar tree: three sections, the open one shows its categories (nested along the chosen path)
+  const branch = (parent, depth) => {
+    const list = kids(sec, parent);
+    if (!list.length) return null;
+    return h('ul', { class: 'branch' + (depth ? ' sub' : '') }, list.map(c => {
+      const n = countIn(sec, c.id), active = c.id === cat;
+      return h('li', null,
+        h('button', { class: 'leaf' + (active ? ' on' : onPath.has(c.id) ? ' path' : ''), 'aria-current': active ? 'true' : null, onclick: () => { setQuery(sec, c.id, q); P.side.classList.remove('open'); } },
+          h('span', { class: 'lt' }, c.name), n ? h('span', { class: 'cnt' + (active ? ' g' : '') }, n) : null),
+        onPath.has(c.id) ? branch(c.id, depth + 1) : null);
+    }));
+  };
+  P.tree.replaceChildren(...SECTIONS.map(k => {
+    const open = k === sec;
+    return h('div', { class: 'grp' + (open ? ' open' : '') },
+      h('button', { class: 'secrow' + (open && !cat ? ' on' : ''), onclick: () => { setQuery(k, '', ''); if (k !== sec) P.side.classList.add('open'); } },
+        icon(SEC_ICON[k]), h('span', { class: 'lt' }, S.home.sections[k].title || SEC_LABEL[k]), h('span', { class: 'cnt' + (open && !cat ? ' g' : '') }, countIn(k, '')), h('i', { class: 'chev', 'aria-hidden': 'true' })),
+      open ? branch('', 0) : null);
+  }));
+  // title: name in ink, count fading to grey (reference style)
+  const name = cat ? catName(cat) : (S.home.sections[sec].title || SEC_LABEL[sec]);
   if (!changed) return;
   const ds = cat ? descendants(cat) : null; const ql = q.toLowerCase();
   const items = S.items.filter(i => i.section === sec && (!ds || ds.has(i.category)) && (!ql || (i.name + ' ' + i.summary + ' ' + catName(i.category)).toLowerCase().includes(ql)));
-  P.meta.replaceChildren(h('span', null, `Showing ${items.length} ${items.length === 1 ? 'item' : 'items'}`), q ? h('button', { class: 'chip', onclick: () => setQuery(sec, cat, '') }, '“' + q + '” ×') : h('span'));
+  P.title.replaceChildren(h('span', null, name), ' ', h('span', { class: 'fade' }, items.length + (items.length === 1 ? ' item' : ' items')));
+  P.title.animate([{ opacity: 0, transform: 'translateY(10px)' }, { opacity: 1, transform: 'none' }], { duration: reduce ? 1 : 600, easing: 'cubic-bezier(.22,1,.36,1)' });
+  P.crumbs.replaceChildren(...[
+    h('button', { onclick: () => setQuery(sec, '', q) }, S.home.sections[sec].title || SEC_LABEL[sec]),
+    ...path.flatMap(c => [h('span', { class: 'sep', 'aria-hidden': 'true' }, '/'), h('button', { class: c.id === cat ? 'on' : '', onclick: () => setQuery(sec, c.id, q) }, c.name)]),
+    q ? h('button', { class: 'qchip', onclick: () => setQuery(sec, cat, '') }, '“' + q + '”  ×') : null].filter(Boolean));
   P.grid.replaceChildren(...(items.length ? items.map((it, i) => itemCard(it, i)) : [h('div', { class: 'empty' }, h('b', null, 'Nothing here yet'), q ? 'Try another search word.' : 'We are adding items to this category soon. Call or WhatsApp us to ask.')]));
 }
 
@@ -436,7 +424,7 @@ function pageItem(v, r) {
 
   const rel = S.items.filter(i => i.id !== it.id && i.section === it.section && (i.category === it.category || path.some(p => descendants(p.id).has(i.category)))).slice(0, 8);
   const more = rel.length ? rel : sib.filter(i => i.id !== it.id).slice(0, 8);
-  if (more.length) v.append(h('section', { class: 'sec wrap', style: { paddingBottom: '20px' } }, h('div', { class: 'rail-head' }, words('h2', 'You may also need')), h('div', { class: 'rail' }, more.map((x, i) => R(itemCard(x), '', i * .05)))));
+  if (more.length) v.append(h('section', { class: 'sec wrap', style: { paddingBottom: '20px' } }, h('div', { class: 'rail-head' }, words('h2', 'You may also need', '', 0, 2)), h('div', { class: 'rail' }, more.map((x, i) => R(itemCard(x), '', i * .05)))));
   const onKey = e => { if (e.target.closest('input,textarea')) return; if (e.key === 'ArrowRight') show((cur + 1) % imgs.length); if (e.key === 'ArrowLeft') show((cur - 1 + imgs.length) % imgs.length); };
   addEventListener('keydown', onKey); cleanup.push(() => removeEventListener('keydown', onKey));
 }
@@ -447,18 +435,17 @@ function pageItem(v, r) {
 function pageTransport(v) {
   const T = S.transport;
   const fleet = S.items.filter(i => i.section === 'transport');
-  const heroImg = S.home.gallery[4] || S.home.gallery[0];
   v.append(h('section', { class: 'wrap t-hero' },
-    h('div', null, R(h('span', { class: 'eyebrow' }, 'Transport service'), 'blur'), words('h1', T.title), R(h('p', null, T.intro), '', .25),
+    h('div', null, R(h('span', { class: 'eyebrow' }, 'Transport service'), 'blur'), words('h1', T.title, '', 0, 2), R(h('p', null, T.intro), '', .25),
       T.points.length ? R(h('div', { class: 'points' }, T.points.map(p => h('span', null, p))), '', .35) : null),
-    R(h('div', { class: 'pic' }, heroImg ? pic(heroImg, 'Kawya Group vehicles') : null, h('span', { class: 'road' })), 'scale', .2)));
+    lorryStage()));
 
   v.append(h('section', { class: 'sec wrap', style: { paddingBottom: '40px' } }, h('div', { class: 'modes' },
     R(h('div', { class: 'mode a' }, h('div', null, h('span', { class: 'num' }, '01'), h('h3', { style: { marginTop: '14px' } }, T.deliveryTitle), h('p', null, T.deliveryText)), arrowBtn('Browse concrete items', '#/products/concrete', 'btn-dark')), 'scale'),
     R(h('div', { class: 'mode b' }, h('div', null, h('span', { class: 'num' }, '02'), h('h3', { style: { marginTop: '14px' } }, T.hireTitle), h('p', null, T.hireText)), arrowBtn('Ask to hire', waLink('Hello Kawya Group, I would like to hire a vehicle for '), 'btn-dark', true)), 'scale', .1))));
 
   v.append(h('section', { class: 'sec wrap', style: { paddingTop: '40px' } },
-    h('div', { class: 'sec-head' }, words('h2', 'Our fleet'), R(h('p', null, fleet.length ? 'Every vehicle is maintained in our own yard and driven by our own team.' : 'Vehicle details coming soon.'), '', .15)),
+    h('div', { class: 'sec-head' }, words('h2', 'Our fleet', '', 0, 1), R(h('p', null, fleet.length ? 'Every vehicle is maintained in our own yard and driven by our own team.' : 'Vehicle details coming soon.'), '', .15)),
     h('div', { class: 'fleet' }, fleet.map((it, i) => {
       const main0 = it.images[0];
       return R(h('article', { class: 'veh' },
@@ -473,11 +460,67 @@ function pageTransport(v) {
 }
 
 /* ------------------------------------------------------------------ */
+/* Lorry that drives in and parks (Transport page)                     */
+/* ------------------------------------------------------------------ */
+const LORRY_SVG = `<svg viewBox="0 0 640 300" aria-hidden="true">
+<defs>
+<linearGradient id="lm" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FFFFFF"/><stop offset=".55" stop-color="#EDEDF0"/><stop offset="1" stop-color="#CFCFD4"/></linearGradient>
+<linearGradient id="lb" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#E9E9EC"/><stop offset="1" stop-color="#BFC0C6"/></linearGradient>
+<linearGradient id="lg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#5A6270"/><stop offset=".5" stop-color="#2A2F38"/><stop offset="1" stop-color="#1A1D23"/></linearGradient>
+<linearGradient id="lp" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#E2E0DC"/><stop offset=".6" stop-color="#BDBAB4"/><stop offset="1" stop-color="#99968F"/></linearGradient>
+<radialGradient id="lh" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#6E6B65"/><stop offset="1" stop-color="#8F8C85"/></radialGradient>
+<radialGradient id="ls" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="rgba(0,0,0,.28)"/><stop offset="1" stop-color="rgba(0,0,0,0)"/></radialGradient>
+</defs>
+<ellipse class="lshadow" cx="330" cy="262" rx="300" ry="16" fill="url(#ls)"/>
+<g class="lbody">
+<rect x="36" y="206" width="560" height="14" rx="6" fill="#2A2B30"/>
+<rect x="36" y="172" width="372" height="36" rx="7" fill="url(#lb)"/>
+<rect x="36" y="172" width="372" height="5" rx="2.5" fill="#fff" opacity=".7"/>
+<g><rect x="58" y="100" width="156" height="72" rx="10" fill="url(#lp)"/><ellipse cx="214" cy="136" rx="15" ry="36" fill="#D9D6D0"/><ellipse cx="215" cy="136" rx="10" ry="27" fill="url(#lh)"/></g>
+<g><rect x="232" y="100" width="156" height="72" rx="10" fill="url(#lp)"/><ellipse cx="388" cy="136" rx="15" ry="36" fill="#D9D6D0"/><ellipse cx="389" cy="136" rx="10" ry="27" fill="url(#lh)"/></g>
+<rect x="404" y="96" width="10" height="112" rx="3" fill="#2A2B30"/>
+<path d="M420 208 V98 Q420 80 438 80 H516 Q538 80 552 98 L594 156 Q604 170 604 186 V208 Z" fill="url(#lm)"/>
+<path d="M452 96 H514 Q526 96 534 106 L566 150 H452 Z" fill="url(#lg)"/>
+<path d="M460 102 H496 L470 144 H460 Z" fill="#fff" opacity=".12"/>
+<path d="M440 108 V194" stroke="#C9C9CE" stroke-width="1.5"/>
+<rect x="452" y="160" width="16" height="4" rx="2" fill="#9A9BA1"/>
+<text x="476" y="190" font-family="Inter Tight, Arial, sans-serif" font-size="11" font-weight="600" letter-spacing="1.6" fill="#8E8E93">KAWYA</text>
+<rect x="588" y="168" width="14" height="12" rx="3" fill="#FFF7D6"/>
+<rect x="562" y="200" width="48" height="14" rx="5" fill="#2A2B30"/>
+</g>
+<g class="wheel"><circle cx="122" cy="226" r="30" fill="#18191C"/><circle cx="122" cy="226" r="17" fill="#D6D7DB"/><circle cx="122" cy="226" r="6" fill="#55575D"/><rect x="119" y="210" width="6" height="8" rx="2" fill="#8E9096"/><rect x="119" y="234" width="6" height="8" rx="2" fill="#8E9096"/><rect x="106" y="223" width="8" height="6" rx="2" fill="#8E9096"/><rect x="130" y="223" width="8" height="6" rx="2" fill="#8E9096"/></g>
+<g class="wheel"><circle cx="198" cy="226" r="30" fill="#18191C"/><circle cx="198" cy="226" r="17" fill="#D6D7DB"/><circle cx="198" cy="226" r="6" fill="#55575D"/><rect x="195" y="210" width="6" height="8" rx="2" fill="#8E9096"/><rect x="195" y="234" width="6" height="8" rx="2" fill="#8E9096"/><rect x="182" y="223" width="8" height="6" rx="2" fill="#8E9096"/><rect x="206" y="223" width="8" height="6" rx="2" fill="#8E9096"/></g>
+<g class="wheel"><circle cx="522" cy="226" r="30" fill="#18191C"/><circle cx="522" cy="226" r="17" fill="#D6D7DB"/><circle cx="522" cy="226" r="6" fill="#55575D"/><rect x="519" y="210" width="6" height="8" rx="2" fill="#8E9096"/><rect x="519" y="234" width="6" height="8" rx="2" fill="#8E9096"/><rect x="506" y="223" width="8" height="6" rx="2" fill="#8E9096"/><rect x="530" y="223" width="8" height="6" rx="2" fill="#8E9096"/></g>
+</svg>`;
+function lorryStage() {
+  const stage = h('div', { class: 'lorry-stage', role: 'img', 'aria-label': 'A Kawya Group lorry carrying concrete pipes', title: 'Tap to drive again' });
+  const road = h('div', { class: 'lroad', 'aria-hidden': 'true' });
+  const truck = h('div', { class: 'lorry' }); truck.innerHTML = LORRY_SVG; // constant markup only
+  stage.append(h('div', { class: 'lglow', 'aria-hidden': 'true' }), road, truck);
+  const body = truck.querySelector('.lbody'), wheels = [...truck.querySelectorAll('.wheel')];
+  let anims = [];
+  const drive = () => {
+    anims.forEach(a => a.cancel()); anims = [];
+    if (reduce) return;
+    const D = 2200, ease = 'cubic-bezier(.16,1,.3,1)';
+    anims.push(truck.animate([{ transform: 'translateX(115%)' }, { transform: 'translateX(0)' }], { duration: D, easing: ease, fill: 'both' }));
+    wheels.forEach(w => anims.push(w.animate([{ transform: 'rotate(0deg)' }, { transform: 'rotate(-1260deg)' }], { duration: D, easing: ease, fill: 'both' })));
+    anims.push(road.animate([{ backgroundPosition: '0 0' }, { backgroundPosition: '-900px 0' }], { duration: D, easing: ease, fill: 'both' }));
+    // brake: the body dips forward, rocks back and settles
+    anims.push(body.animate([{ transform: 'rotate(0deg)' }, { offset: .72, transform: 'rotate(0deg)' }, { offset: .82, transform: 'rotate(1.6deg)' }, { offset: .9, transform: 'rotate(-.7deg)' }, { offset: .96, transform: 'rotate(.25deg)' }, { transform: 'rotate(0deg)' }], { duration: D + 500, easing: 'ease-out', fill: 'both' }));
+  };
+  stage.addEventListener('click', drive);
+  requestAnimationFrame(() => requestAnimationFrame(drive));
+  cleanup.push(() => anims.forEach(a => a.cancel()));
+  return stage;
+}
+
+/* ------------------------------------------------------------------ */
 /* CONTACT                                                             */
 /* ------------------------------------------------------------------ */
 function pageContact(v) {
   const C = S.settings;
-  v.append(h('section', { class: 'phead wrap' }, R(h('span', { class: 'eyebrow' }, 'Contact us'), 'blur'), words('h1', 'Talk to Kawya Group'), R(h('p', null, 'Call, WhatsApp or visit the yard. We are happy to help with sizes, quantities and delivery.'), '', .25)));
+  v.append(h('section', { class: 'phead wrap' }, R(h('span', { class: 'eyebrow' }, 'Contact us'), 'blur'), words('h1', 'Talk to Kawya Group', '', 0, 2), R(h('p', null, 'Call, WhatsApp or visit the yard. We are happy to help with sizes, quantities and delivery.'), '', .25)));
   const wa = waHref(waNumber());
   const grid = h('div', { class: 'c-grid' });
   grid.append(

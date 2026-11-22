@@ -115,6 +115,15 @@ service cloud.firestore {
       allow delete: if isOwner();
     }
 
+    match /private/{doc} {
+      // Owner-only settings (the AI Studio API key). Never readable by the public.
+      allow read: if isOwner();
+      allow write: if isOwner() && doc == 'ai'
+        && request.resource.data.keys().hasOnly(['key', 'model'])
+        && str(request.resource.data.key, 200) && str(request.resource.data.model, 80)
+        && request.resource.data.model.matches('^[a-z0-9][a-z0-9.-]*$');
+    }
+
     // Everything else is closed.
     match /{document=**} {
       allow read, write: if false;
