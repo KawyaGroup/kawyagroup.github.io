@@ -241,3 +241,13 @@ p { margin: 0; }
 .frow { display: flex; align-items: center; justify-content: space-between; gap: 8px; font: 500 12.5px/1 var(--body); color: var(--txt2); }
 .linkb { font-size: 12.5px; font-weight: 600; color: var(--accent); padding: 2px 4px; border-radius: 6px; }
 .linkb:hover { text-decoration: underline; }
+
+
+/* black & white accents (no yellow / green) */
+:root { --accent: #FFFFFF; --green: #FFFFFF; }
+.pill.y, .pill.g { background: rgba(255,255,255,.14); color: #fff; }
+.imgs .ti .first { background: #fff; color: #121212; }
+.aiwarn { background: rgba(255,255,255,.08) !important; color: var(--txt) !important; }
+.tg input:checked { background: #fff; }
+.tg input:checked::after { background: #121212; }
+.toast::before { background: #fff; }

@@ -1,5 +1,5 @@
-import { cachedSite, loadSite, fullSrc, SECTIONS, telHref, waHref, mailHref, mapEmbed, ID_RE } from './data.js?v=202611221117';
-import { h, icon } from './ui.js?v=202611221117';
+import { cachedSite, loadSite, fullSrc, SECTIONS, telHref, waHref, mailHref, mapEmbed, ID_RE } from './data.js?v=202611221404';
+import { h, icon } from './ui.js?v=202611221404';
 
 const $ = (s, r = document) => r.querySelector(s);
 const main = $('#main');
@@ -35,6 +35,8 @@ async function render(opts = {}) {
   if (old && !opts.instant && !reduce) { old.classList.add('out'); await new Promise(res => setTimeout(res, 200)); }
   cleanup.forEach(f => { try { f(); } catch (e) { /* ignore */ } }); cleanup = [];
   const view = h('div', { class: 'view' });
+  // once the page has faded in, drop the animation so fixed elements (drawers) attach to the screen again
+  view.addEventListener('animationend', e => { if (e.target === view && !view.classList.contains('out')) view.style.animation = 'none'; });
   main.replaceChildren(view);
   page(view, r);
   if (!opts.keepScroll) window.scrollTo({ top: 0, behavior: 'instant' });
@@ -58,14 +60,24 @@ function setActive(name) {
 function movePill() { /* active link is underlined in CSS */ }
 addEventListener('resize', movePill);
 if (document.fonts) document.fonts.ready.then(movePill);
+// Mobile menu: a small liquid-glass bubble that pops out under the Menu button.
 const burger = $('#burger'), sheet = $('#sheet');
-function closeSheet() { sheet.hidden = true; burger.setAttribute('aria-expanded', 'false'); document.body.style.overflow = ''; }
-burger.addEventListener('click', () => {
-  const open = sheet.hidden;
-  sheet.hidden = !open; burger.setAttribute('aria-expanded', String(open));
-  document.body.style.overflow = open ? 'hidden' : '';
-  if (open) sheet.querySelectorAll('a').forEach(a => { a.style.animation = 'none'; void a.offsetWidth; a.style.animation = ''; });
-});
+sheet.querySelectorAll('a[data-ic]').forEach(a => a.prepend(h('span', { class: 'bi' }, icon(a.dataset.ic))));
+let sheetT = 0;
+function closeSheet() {
+  if (sheet.hidden || sheet.classList.contains('closing')) return;
+  burger.setAttribute('aria-expanded', 'false');
+  sheet.classList.add('closing'); clearTimeout(sheetT);
+  sheetT = setTimeout(() => { sheet.hidden = true; sheet.classList.remove('closing'); }, reduce ? 0 : 260);
+}
+function openSheet() {
+  clearTimeout(sheetT); sheet.classList.remove('closing'); sheet.hidden = false;
+  burger.setAttribute('aria-expanded', 'true');
+  sheet.querySelectorAll('a').forEach(a => { a.style.animation = 'none'; void a.offsetWidth; a.style.animation = ''; });
+}
+burger.addEventListener('click', e => { e.stopPropagation(); sheet.hidden ? openSheet() : closeSheet(); });
+sheet.addEventListener('click', e => { if (e.target === sheet) closeSheet(); });
+addEventListener('scroll', () => { if (!sheet.hidden) closeSheet(); }, { passive: true });
 addEventListener('keydown', e => { if (e.key === 'Escape') { closeSheet(); const lb = $('.lb'); if (lb) lb.remove(); } });
 // the top bar always stays visible; a hairline appears once the page is scrolled
 const navEl = $('#nav');
@@ -306,20 +318,63 @@ function setQuery(sec, cat, q) {
   productsUpdate(parseRoute());
 }
 function pageProducts(v, r) {
-  const side = h('aside', { class: 'side' });
-  const toggle = h('button', { class: 'side-toggle', 'aria-expanded': 'false', onclick: () => { const o = side.classList.toggle('open'); toggle.setAttribute('aria-expanded', String(o)); } }, icon('filter'), h('span', null, 'Browse categories'), h('i', { class: 'chev', 'aria-hidden': 'true' }));
+  const side = h('aside', { class: 'side', id: 'pside' });
   const tree = h('nav', { class: 'tree', 'aria-label': 'Product sections and categories' });
-  side.append(h('div', { class: 'side-logo' }, h('span', { class: 'disc' }, h('img', { src: 'assets/img/mark.svg', alt: '' })), h('div', null, h('b', null, 'Kawya'), h('span', null, 'Product range'))), toggle, tree);
+  const scrim = h('div', { class: 'pscrim', 'aria-hidden': 'true' });
+  const hamb = h('button', { class: 'mhamb', 'aria-label': 'Open categories', 'aria-controls': 'pside', 'aria-expanded': 'false' }, h('i'), h('i'), h('i'));
+  const mnow = h('span', { class: 'mnow' });
+  const mbar = h('div', { class: 'mbar' }, hamb, h('button', { class: 'mlabel', onclick: () => openSide() }, h('small', null, 'Categories'), mnow));
+  const openSide = () => { side.classList.add('open'); scrim.classList.add('on'); hamb.setAttribute('aria-expanded', 'true'); document.body.classList.add('noscroll'); };
+  const closeSide = () => { side.classList.remove('open'); scrim.classList.remove('on'); hamb.setAttribute('aria-expanded', 'false'); document.body.classList.remove('noscroll'); };
+  hamb.addEventListener('click', () => (side.classList.contains('open') ? closeSide() : openSide()));
+  scrim.addEventListener('click', closeSide);
+  const onKey = e => { if (e.key === 'Escape') closeSide(); };
+  addEventListener('keydown', onKey);
+  side.append(h('div', { class: 'side-logo' }, h('span', { class: 'disc' }, h('img', { src: 'assets/img/mark.svg', alt: '' })), h('div', null, h('b', null, 'Kawya'), h('span', null, 'Product range')),
+    h('button', { class: 'side-x', 'aria-label': 'Close categories', onclick: closeSide }, icon('close'))), tree);
   const title = h('h1', { class: 'ptitle' });
   const search = h('input', { type: 'search', placeholder: 'Search products', 'aria-label': 'Search products', maxlength: '60' });
   let st; search.addEventListener('input', () => { clearTimeout(st); st = setTimeout(() => setQuery(P.sec, P.cat, search.value.trim()), 180); });
   const crumbs = h('div', { class: 'pcrumbs' });
   const grid = h('div', { class: 'pgrid' });
-  const pmain = h('div', { class: 'pmain' }, h('div', { class: 'phead2' }, title, h('label', { class: 'psearch' }, icon('search'), search)), crumbs, grid);
-  v.append(h('section', { class: 'pwrap wrap' }, h('div', { class: 'panel' }, side, pmain)));
-  P = { tree, title, search, crumbs, grid, side, sec: null, cat: null, q: null };
+  const pmain = h('div', { class: 'pmain' }, mbar, h('div', { class: 'phead2' }, title, h('label', { class: 'psearch' }, icon('search'), search)), crumbs, grid);
+  v.append(h('section', { class: 'pwrap wrap' }, h('div', { class: 'panel' }, side, pmain)), scrim);
+  P = { tree, title, search, crumbs, grid, side, mnow, closeSide, sec: null, cat: null, q: null };
   productsUpdate(r, true);
-  cleanup.push(() => { P = null; });
+  cleanup.push(() => { closeSide(); removeEventListener('keydown', onKey); P = null; });
+}
+function renderTree() {
+  if (!P) return;
+  const { sec, cat, q } = P;
+  const path = cat ? pathTo(cat) : [], onPath = new Set(path.map(c => c.id));
+  const tog = (key, label) => {
+    const open = P.exp.has(key);
+    return h('button', { class: 'tog' + (open ? ' open' : ''), 'aria-expanded': String(open), 'aria-label': (open ? 'Close ' : 'Open ') + label,
+      onclick: e => { e.stopPropagation(); open ? P.exp.delete(key) : P.exp.add(key); renderTree(); } }, h('i', { class: 'chev', 'aria-hidden': 'true' }));
+  };
+  const branch = (k, parent, depth) => {
+    const list = kids(k, parent);
+    if (!list.length) return null;
+    return h('ul', { class: 'branch' + (depth ? ' sub' : '') }, list.map(c => {
+      const n = countIn(k, c.id), active = k === sec && c.id === cat, hasKids = kids(k, c.id).length > 0, key = 'c:' + c.id;
+      return h('li', null,
+        h('div', { class: 'rowx' },
+          h('button', { class: 'leaf' + (active ? ' on' : onPath.has(c.id) ? ' path' : ''), 'aria-current': active ? 'true' : null,
+            onclick: () => { P.exp.add(key); setQuery(k, c.id, k === sec ? q : ''); if (!hasKids) P.closeSide(); } },
+            h('span', { class: 'lt' }, c.name), n ? h('span', { class: 'cnt' + (active ? ' g' : '') }, n) : null),
+          hasKids ? tog(key, c.name) : h('span', { class: 'tog-sp', 'aria-hidden': 'true' })),
+        hasKids && P.exp.has(key) ? branch(k, c.id, depth + 1) : null);
+    }));
+  };
+  P.tree.replaceChildren(...SECTIONS.map(k => {
+    const cur = k === sec, key = 's:' + k, hasKids = kids(k, '').length > 0;
+    return h('div', { class: 'grp' + (cur ? ' open' : '') },
+      h('div', { class: 'rowx' },
+        h('button', { class: 'secrow' + (cur && !cat ? ' on' : ''), onclick: () => { P.exp.add(key); setQuery(k, '', ''); if (cur) P.closeSide(); } },
+          icon(SEC_ICON[k]), h('span', { class: 'lt' }, S.home.sections[k].title || SEC_LABEL[k]), h('span', { class: 'cnt' + (cur && !cat ? ' g' : '') }, countIn(k, ''))),
+        hasKids ? tog(key, S.home.sections[k].title || SEC_LABEL[k]) : h('span', { class: 'tog-sp', 'aria-hidden': 'true' })),
+      hasKids && P.exp.has(key) ? branch(k, '', 0) : null);
+  }));
 }
 function productsUpdate(r, first = false) {
   if (!P) return;
@@ -330,26 +385,13 @@ function productsUpdate(r, first = false) {
   P.sec = sec; P.cat = cat; P.q = q;
   if (document.activeElement !== P.search) P.search.value = q;
   const path = cat ? pathTo(cat) : [];
-  const onPath = new Set(path.map(c => c.id));
-  // sidebar tree: three sections, the open one shows its categories (nested along the chosen path)
-  const branch = (parent, depth) => {
-    const list = kids(sec, parent);
-    if (!list.length) return null;
-    return h('ul', { class: 'branch' + (depth ? ' sub' : '') }, list.map(c => {
-      const n = countIn(sec, c.id), active = c.id === cat;
-      return h('li', null,
-        h('button', { class: 'leaf' + (active ? ' on' : onPath.has(c.id) ? ' path' : ''), 'aria-current': active ? 'true' : null, onclick: () => { setQuery(sec, c.id, q); P.side.classList.remove('open'); } },
-          h('span', { class: 'lt' }, c.name), n ? h('span', { class: 'cnt' + (active ? ' g' : '') }, n) : null),
-        onPath.has(c.id) ? branch(c.id, depth + 1) : null);
-    }));
-  };
-  P.tree.replaceChildren(...SECTIONS.map(k => {
-    const open = k === sec;
-    return h('div', { class: 'grp' + (open ? ' open' : '') },
-      h('button', { class: 'secrow' + (open && !cat ? ' on' : ''), onclick: () => { setQuery(k, '', ''); if (k !== sec) P.side.classList.add('open'); } },
-        icon(SEC_ICON[k]), h('span', { class: 'lt' }, S.home.sections[k].title || SEC_LABEL[k]), h('span', { class: 'cnt' + (open && !cat ? ' g' : '') }, countIn(k, '')), h('i', { class: 'chev', 'aria-hidden': 'true' })),
-      open ? branch('', 0) : null);
-  }));
+  // sidebar tree: every section / category with sub-items has its own open-close arrow.
+  // The current section and the chosen path open automatically; the visitor can open or close any row.
+  P.exp = P.exp || new Set();
+  P.exp.add('s:' + sec); path.forEach(c => P.exp.add('c:' + c.id));
+  renderTree();
+  // phone bar: show where you are (section › category)
+  P.mnow.textContent = [S.home.sections[sec].title || SEC_LABEL[sec]].concat(path.map(c => c.name)).join(' › ');
   // title: name in ink, count fading to grey (reference style)
   const name = cat ? catName(cat) : (S.home.sections[sec].title || SEC_LABEL[sec]);
   if (!changed) return;

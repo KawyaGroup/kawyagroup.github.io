@@ -2,7 +2,7 @@
 // - Firebase Firestore when js/firebase-config.js is filled in.
 // - "demo" mode on localhost when Firebase is not set up (data kept in this browser only, for testing).
 // - Built-in defaults otherwise.
-import { FIREBASE_CONFIG } from './firebase-config.js?v=202611221117';
+import { FIREBASE_CONFIG } from './firebase-config.js?v=202611221404';
 
 export const FB_VERSION = '10.12.2';
 export const fbReady = () => !!FIREBASE_CONFIG.apiKey && !String(FIREBASE_CONFIG.apiKey).startsWith('PASTE');

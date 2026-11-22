@@ -30,6 +30,8 @@ const P = {
   fb: '<path d="M14 8h3V4h-3a4 4 0 0 0-4 4v2H7v4h3v7h4v-7h3l1-4h-4V8z"/>',
   filter: '<path d="M4 6h16M7 12h10M10 18h4"/>',
   close: '<path d="M6 6l12 12M18 6L6 18"/>',
+  home: '<path d="M4 11l8-7 8 7v9H4z"/><path d="M10 20v-6h4v6"/>',
+  user: '<circle cx="12" cy="8" r="4"/><path d="M4 21c1-4.5 4.5-6.5 8-6.5s7 2 8 6.5"/>',
 };
 export function icon(name) {
   const s = document.createElement('span');
