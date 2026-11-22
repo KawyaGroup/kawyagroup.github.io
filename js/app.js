@@ -1,5 +1,5 @@
-import { cachedSite, loadSite, fullSrc, SECTIONS, telHref, waHref, mailHref, mapEmbed, ID_RE } from './data.js';
-import { h, icon } from './ui.js';
+import { cachedSite, loadSite, fullSrc, SECTIONS, telHref, waHref, mailHref, mapEmbed, ID_RE } from './data.js?v=202611221052';
+import { h, icon } from './ui.js?v=202611221052';
 
 const $ = (s, r = document) => r.querySelector(s);
 const main = $('#main');
